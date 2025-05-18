@@ -1,0 +1,461 @@
+schema_version: 3
+initial:
+  - CREATE TABLE IF NOT EXISTS Version
+    (
+    name    VARCHAR(10)       NOT NULL,
+    version SMALLINT UNSIGNED NOT NULL,
+    PRIMARY KEY (name)
+    );
+
+  - CREATE TABLE IF NOT EXISTS CustomerProfile
+    (
+    customer_profile_id  VARCHAR(100) NOT NULL PRIMARY KEY,
+    onboard_status       VARCHAR(100) NOT NULL,
+    payment_provider_id  VARCHAR(100) NOT NULL,
+    created_by           VARCHAR(100) NOT NULL,
+    deleted              BOOLEAN      NOT NULL DEFAULT FALSE,
+    create_ts            TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts            TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) 
+    );
+
+  - CREATE TABLE IF NOT EXISTS CustomerProfileLedger (
+    ledger_id            VARCHAR(256) NOT NULL PRIMARY KEY,
+    customer_profile_id  VARCHAR(256) NOT NULL,
+    ledger_type          VARCHAR(256) NOT NULL  DEFAULT 'EXTERNAL',
+    holding_type         VARCHAR(256) NOT NULL,
+    is_negative          BOOLEAN      NOT NULL  DEFAULT FALSE,
+    deleted              BOOLEAN      NOT NULL  DEFAULT FALSE,
+    create_ts            TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts            TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    INDEX customer_profile_id_index (customer_profile_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS EndCustomerProfile
+    (
+    end_customer_profile_id VARCHAR(100) NOT NULL PRIMARY KEY,
+    customer_profile_id     VARCHAR(100) NOT NULL,
+    onboard_status          VARCHAR(100) NOT NULL,
+    created_by              VARCHAR(100) NOT NULL,
+    deleted                 BOOLEAN      NOT NULL DEFAULT FALSE,
+    create_ts               TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts               TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    INDEX customer_profile_id_index (customer_profile_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS AccountLedger
+    (
+    ledger_id            VARCHAR(256) NOT NULL,
+    account_id           VARCHAR(256) NOT NULL,
+    holding_type         VARCHAR(256) NOT NULL,
+    ledger_type          VARCHAR(256) NOT NULL,
+    customer_profile_id  VARCHAR(256) NOT NULL,
+    deleted              BOOLEAN      NOT NULL DEFAULT FALSE,
+    create_ts            TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts            TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (account_id, ledger_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS LedgerTransaction
+    (
+    ledger_txn_id      VARCHAR(100)     NOT NULL PRIMARY KEY,
+    from_ledger_id     VARCHAR(100)     NOT NULL,
+    to_ledger_id       VARCHAR(100)     NOT NULL,
+    transaction_id     VARCHAR(100)     NOT NULL,
+    amount             DECIMAL(20, 10)  NOT NULL,
+    ledger_txn_status  VARCHAR(100)     NOT NULL,
+    ledger_txn_type    VARCHAR(100)     NOT NULL,
+    deleted            BOOLEAN          NOT NULL DEFAULT FALSE,
+    complete_ts        TIMESTAMP(6)     NULL,
+    create_ts          TIMESTAMP(6)     DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts          TIMESTAMP(6)     DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    INDEX transaction_id_index (transaction_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS LedgerSnapshot
+    (
+    ledger_id        VARCHAR(256)   NOT NULL,
+    ledger_txn_id    VARCHAR(256)   NOT NULL,
+    available_units  DECIMAL(20,10) NOT NULL,
+    total_units      DECIMAL(20,10) NOT NULL,
+    complete_ts      TIMESTAMP(6)   NOT NULL,
+    deleted          BOOLEAN        NOT NULL DEFAULT FALSE,
+    create_ts        TIMESTAMP(6)   DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts        TIMESTAMP(6)   DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (ledger_txn_id, ledger_id),
+    INDEX complete_ts_index (complete_ts, ledger_id)
+    )
+
+  - CREATE TABLE IF NOT EXISTS FundAccount
+    (
+    customer_profile_id      VARCHAR(100) NOT NULL,
+    for_customer_profile_id  VARCHAR(100) NOT NULL DEFAULT '',
+    payment_provider_id      VARCHAR(100) NOT NULL,
+    fund_account_id          VARCHAR(100) NOT NULL,
+    account_type             VARCHAR(100) NOT NULL,
+    payment_account_id       VARCHAR(100) NOT NULL,
+    account_status           VARCHAR(100) NOT NULL,
+    account_details          JSON         DEFAULT(JSON_OBJECT()),
+    deleted                  BOOLEAN      NOT NULL DEFAULT FALSE,
+    create_ts                TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts                TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (for_customer_profile_id, account_type),
+    INDEX payment_account_id_index (payment_account_id)
+    )
+
+  - CREATE TABLE IF NOT EXISTS FundTransaction
+    (
+    payment_transaction_id   VARCHAR(256)     NULL UNIQUE,
+    payment_account_id       VARCHAR(256)     NOT NULL,
+    service_account_id       VARCHAR(256)     NOT NULL,
+    customer_profile_id      VARCHAR(256)     NOT NULL,
+    payment_idempotency_key  VARCHAR(256)     NOT NULL,
+    txn_type                 VARCHAR(256)     NULL,
+    sub_txn_type             VARCHAR(256)     NULL,
+    service_transaction_id   VARCHAR(256)     NULL,
+    txn_amount               DECIMAL(20, 10)  NOT NULL,
+    currency                 VARCHAR(256)     NOT NULL,
+    txn_rail                 VARCHAR(256)     NOT NULL,
+    txn_status               VARCHAR(256)     NOT NULL,
+    purpose                  VARCHAR(256)     NOT NULL,
+    transceiver              JSON             NOT NULL,
+    metadata                 JSON             NULL,
+    txn_settled_ts           TIMESTAMP(6)     NULL,
+    deleted                  BOOLEAN          NOT NULL DEFAULT FALSE,
+    create_ts                TIMESTAMP(6)     DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts                TIMESTAMP(6)     DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+    );
+
+  - CREATE TABLE IF NOT EXISTS ParamConfig (
+    param_name                   VARCHAR(256)  NOT NULL,
+    product_type                 VARCHAR(100)  NOT NULL,
+    provider_id                  VARCHAR(100)  NOT NULL,
+    description                  TEXT          NOT NULL,
+    data_type                    VARCHAR(50)   NOT NULL,
+    mandatory                    BOOLEAN       NOT NULL,
+    mutable                      BOOLEAN       NOT NULL,
+    allow_end_customer_override  BOOLEAN       NOT NULL DEFAULT FALSE ,
+    value                        JSON          NOT NULL,
+    deleted                      BOOLEAN       NOT NULL DEFAULT FALSE ,
+    create_ts                    TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts                    TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (param_name, product_type, provider_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS Product (
+    product_id          VARCHAR(100) NOT NULL PRIMARY KEY,
+    customer_profile_id VARCHAR(100) NOT NULL,
+    product_name        VARCHAR(100) NOT NULL,
+    product_code        VARCHAR(100) NOT NULL,
+    product_class       VARCHAR(100) NOT NULL,
+    product_type        VARCHAR(100) NOT NULL,
+    profile_type        VARCHAR(100) NOT NULL,
+    provider_id         VARCHAR(100) NOT NULL,
+    product_category    VARCHAR(100) NULL,
+    description         TEXT         NULL,
+    product_status      VARCHAR(50)  NOT NULL,
+    deleted             BOOLEAN      NOT NULL DEFAULT FALSE,
+    create_ts           TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts           TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    UNIQUE (customer_profile_id, product_code)
+    );
+
+  - CREATE TABLE IF NOT EXISTS ProductParam (
+    product_id  VARCHAR(100) NOT NULL,
+    param_name  VARCHAR(256) NOT NULL,
+    data_type   VARCHAR(50)  NOT NULL,
+    value       JSON         NOT NULL,
+    deleted     BOOLEAN      NOT NULL DEFAULT FALSE,
+    create_ts   TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts   TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (product_id, param_name)
+    );
+
+  - CREATE TABLE IF NOT EXISTS OverriddenParam (
+    product_id              VARCHAR(100) NOT NULL,
+    product_impl_id         VARCHAR(100) NOT NULL,
+    param_name              VARCHAR(256) NOT NULL,
+    data_type               VARCHAR(50)  NOT NULL,
+    override_value          JSON         NOT NULL,
+    deleted                 BOOLEAN      NOT NULL DEFAULT FALSE ,
+    create_ts               DATETIME(6)  DEFAULT CURRENT_TIMESTAMP(6) NOT NULL,
+    update_ts               DATETIME(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)  NOT NULL,
+    INDEX product_impl_id_index (product_impl_id, product_id, param_name)
+    );
+
+  - CREATE TABLE IF NOT EXISTS TransactionCodeConfig
+    (
+    customer_profile_id          VARCHAR(100)  NOT NULL,
+    product_id                   VARCHAR(100)  NOT NULL PRIMARY KEY,
+    transaction_codes            JSON          NOT NULL,
+    deleted                      BOOLEAN       NOT NULL DEFAULT FALSE,
+    create_ts                    TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts                    TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+    );
+
+  - CREATE TABLE IF NOT EXISTS Fee
+    (
+    customer_profile_id    VARCHAR(256)    NOT NULL,
+    fee_id                 VARCHAR(256)    NOT NULL PRIMARY KEY,
+    fee_code               VARCHAR(256)    NOT NULL,
+    product_id             VARCHAR(256)    NOT NULL,
+    fee_description        TEXT            NULL,
+    fee_type               VARCHAR(256)    NOT NULL,
+    txn_code               VARCHAR(256)    NOT NULL,
+    rule_group             JSON            DEFAULT (JSON_OBJECT()),
+    fee_details            JSON            DEFAULT (JSON_OBJECT()),
+    push_overdraft         BOOLEAN         NOT NULL DEFAULT FALSE,
+    deleted                BOOLEAN         NOT NULL DEFAULT FALSE,
+    create_ts              TIMESTAMP(6)    DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts              TIMESTAMP(6)    DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    UNIQUE (fee_code, product_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS Tax
+    (
+    customer_profile_id    VARCHAR(256)    NOT NULL,
+    tax_id                 VARCHAR(256)    NOT NULL PRIMARY KEY,
+    tax_code               VARCHAR(256)    NOT NULL,
+    product_id             VARCHAR(256)    NOT NULL,
+    tax_description        TEXT            NULL,
+    txn_code               VARCHAR(256)    NOT NULL,
+    rule_group             JSON            DEFAULT (JSON_OBJECT()),
+    push_overdraft         BOOLEAN         NOT NULL DEFAULT FALSE,
+    deleted                BOOLEAN         NOT NULL DEFAULT FALSE,
+    create_ts              TIMESTAMP(6)    DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts              TIMESTAMP(6)    DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    UNIQUE (tax_code, product_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS TransactionLimit
+    (
+    customer_profile_id   VARCHAR(100)  NOT NULL,
+    product_id            VARCHAR(100)  NOT NULL,
+    limit_id              VARCHAR(100)  NOT NULL PRIMARY KEY,
+    limit_code            VARCHAR(9)    NOT NULL,
+    limit_description     TEXT          NULL,
+    rule_group            JSON          DEFAULT (JSON_OBJECT())                                     NOT NULL,
+    deleted               BOOLEAN       DEFAULT false                                               NOT NULL,
+    create_ts             TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6)                                NOT NULL,
+    update_ts             TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) NOT NULL,
+    UNIQUE limit_code_unique_key (limit_code, product_id)
+    );
+
+
+
+
+
+
+
+  - CREATE TABLE IF NOT EXISTS CreditAccountBucketConfig
+    (
+    customer_profile_id   VARCHAR(100)        NOT NULL,
+    product_id            VARCHAR(100)        NOT NULL PRIMARY KEY,
+    bucket_config         JSON                DEFAULT (JSON_OBJECT())           NOT NULL,
+    deleted               BOOLEAN       DEFAULT false                                               NOT NULL,
+    create_ts             TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6)                                NOT NULL,
+    update_ts             TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) NOT NULL
+    );
+
+  - CREATE TABLE IF NOT EXISTS CreditAccount
+    (
+    credit_account_id        VARCHAR(256)   NOT NULL PRIMARY KEY,
+    account_number           VARCHAR(256)   NOT NULL UNIQUE,
+    customer_profile_id      VARCHAR(256)   NOT NULL,
+    end_customer_profile_id  VARCHAR(256)   NULL,
+    idempotency_key          VARCHAR(256)   NULL,
+    product_id               VARCHAR(256)   NOT NULL,
+    product_metadata         JSON           DEFAULT (JSON_OBJECT()),
+    currency                 VARCHAR(256)   NOT NULL,
+    account_status           VARCHAR(256)   NOT NULL,
+    country                  VARCHAR(256)   NOT NULL,
+    approved_limit           DECIMAL(20,10) NOT NULL,
+    metadata                 JSON           DEFAULT (JSON_OBJECT()),
+    accessed_by              JSON           DEFAULT (JSON_OBJECT()),
+    notification_recipients  JSON           DEFAULT (JSON_OBJECT()),
+    deleted                  BOOLEAN        NOT NULL DEFAULT FALSE,
+    create_ts                TIMESTAMP(6)   DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts                TIMESTAMP(6)   DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    UNIQUE(idempotency_key, customer_profile_id),
+    INDEX end_customer_profile_id_index (end_customer_profile_id),
+    INDEX customer_profile_id_idempotency_key_index (customer_profile_id, idempotency_key)
+    );
+
+  - CREATE TABLE IF NOT EXISTS CreditAccountState
+    (
+    credit_account_id   VARCHAR(256)  NOT NULL,
+    state               VARCHAR(256)  NOT NULL,
+    updated_by_bill_id  VARCHAR(256)  NULL,
+    deleted             BOOLEAN       NOT NULL DEFAULT FALSE,
+    create_ts           TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts           TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (credit_account_id)
+    )
+
+  - CREATE TABLE IF NOT EXISTS CreditAccountTransaction (
+    transaction_id           VARCHAR(256)       NOT NULL PRIMARY KEY,
+    customer_profile_id      VARCHAR(256)       NOT NULL,
+    end_customer_profile_id  VARCHAR(256)       NULL,
+    account_id               VARCHAR(256)       NOT NULL,
+    group_id                 VARCHAR(256)       NULL,
+    amount                   DECIMAL(20, 10)    NOT NULL,
+    txn_code                 VARCHAR(256)       NOT NULL,
+    txn_type                 VARCHAR(256)       NOT NULL,
+    sub_txn_type             VARCHAR(256)       NOT NULL,
+    funding_account_id       VARCHAR(256)       NOT NULL,
+    transceiver              JSON               NOT NULL,
+    purpose                  VARCHAR(256)       NOT NULL,
+    currency                 VARCHAR(256)       NOT NULL,
+    internal_details         JSON               DEFAULT (JSON_OBJECT()),
+    mandate                  VARCHAR(256)       NOT NULL DEFAULT '',
+    txn_count                SMALLINT UNSIGNED  NOT NULL DEFAULT 0,
+    txn_status               VARCHAR(256)       NOT NULL,
+    created_by               VARCHAR(256)       NOT NULL,
+    accessed_by              JSON               DEFAULT (JSON_OBJECT()),
+    notification_recipients  JSON               DEFAULT (JSON_OBJECT()),
+    metadata                 JSON               NULL,
+    location_details         JSON               DEFAULT (JSON_OBJECT()),
+    deleted                  BOOLEAN            NOT NULL DEFAULT FALSE,
+    run_ts                   TIMESTAMP(6)       NOT NULL,
+    clear_ts                 TIMESTAMP(6)       NULL,
+    complete_ts              TIMESTAMP(6)       NULL,
+    booking_ts               TIMESTAMP(6)       NOT NULL,
+    value_ts                 TIMESTAMP(6)       NULL,
+    create_ts                TIMESTAMP(6)       DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts                TIMESTAMP(6)       DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    INDEX account_id_index (account_id),
+    INDEX end_customer_profile_id_index (end_customer_profile_id),
+    INDEX group_id_index (group_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS CreditAccountTransactionIdempotency (
+    customer_profile_id VARCHAR(256)  NOT NULL,
+    idempotency_key     VARCHAR(256)  NOT NULL,
+    request_origin      VARCHAR(100)  NOT NULL,
+    transaction_id      VARCHAR(256)  NOT NULL,
+    deleted             BOOLEAN       NOT NULL DEFAULT FALSE,
+    create_ts           TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts           TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (customer_profile_id, idempotency_key, request_origin)
+    );
+
+  - CREATE TABLE IF NOT EXISTS CreditAccountCardTxnGroup (
+    group_id                VARCHAR(256)    NOT NULL,
+    amount                  DECIMAL(20, 10) NOT NULL,
+    service_transaction_id  VARCHAR(256)    NOT NULL PRIMARY KEY,
+    deleted                 BOOLEAN         NOT NULL DEFAULT FALSE,
+    create_ts               TIMESTAMP(6)    DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts               TIMESTAMP(6)    DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    INDEX group_id_index (group_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS CreditAccountBill (
+    bill_id              VARCHAR(256)     NOT NULL PRIMARY KEY,
+    customer_profile_id  VARCHAR(256)     NOT NULL,
+    credit_account_id    VARCHAR(256)     NOT NULL,
+    currency             VARCHAR(256)     NOT NULL,
+    total_amount_due     DECIMAL(20, 10)  NOT NULL DEFAULT 0,
+    minimum_amount_due   DECIMAL(20, 10)  NOT NULL DEFAULT 0,
+    bill_date            DATE             NOT NULL,
+    due_date             DATE             NOT NULL,
+    status               VARCHAR(256)     NOT NULL,
+    recovery_snapshot    JSON             DEFAULT (JSON_OBJECT()),
+    repaid_by_due_date   DECIMAL(20,10)   NOT NULL DEFAULT 0,
+    details              JSON             DEFAULT (JSON_OBJECT()),
+    deleted              BOOLEAN          NOT NULL DEFAULT FALSE,
+    create_ts            TIMESTAMP(6)     DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts            TIMESTAMP(6)     DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    INDEX account_id_index (credit_account_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS CreditAccountEMI (
+    emi_id                VARCHAR(100)        NOT NULL PRIMARY KEY,
+    customer_profile_id   VARCHAR(100)        NOT NULL,
+    credit_account_id     VARCHAR(100)        NOT NULL,
+    tenure                SMALLINT UNSIGNED   NOT NULL,
+    interest_rate         DECIMAL(20,10)      NOT NULL,
+    reference_type        VARCHAR(100)        NOT NULL,
+    reference_id          VARCHAR(100)        NOT NULL,
+    emi_details           JSON                DEFAULT (JSON_OBJECT())                               NOT NULL,
+    loan_account_id       VARCHAR(100)        NOT NULL,
+    emi_status            VARCHAR(100)        NOT NULL,
+    deleted               BOOLEAN             DEFAULT false                                         NOT NULL,
+    create_ts             TIMESTAMP(6)        DEFAULT CURRENT_TIMESTAMP(6)                          NOT NULL,
+    update_ts             TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) NOT NULL,
+    INDEX reference_id_index (reference_id, reference_type)
+    );
+
+
+
+
+
+
+
+
+  - CREATE TABLE IF NOT EXISTS LoanAccount (
+    loan_account_id          VARCHAR(256)   NOT NULL PRIMARY KEY,
+    account_number           VARCHAR(256)   NOT NULL UNIQUE,
+    customer_profile_id      VARCHAR(256)   NOT NULL,
+    end_customer_profile_id  VARCHAR(256)   NULL,
+    idempotency_key          VARCHAR(256)   NULL,
+    product_id               VARCHAR(256)   NOT NULL,
+    product_metadata         JSON           DEFAULT (JSON_OBJECT()),
+    currency                 VARCHAR(256)   NOT NULL,
+    account_status           VARCHAR(256)   NOT NULL,
+    country                  VARCHAR(256)   NOT NULL,
+    approved_amount          DECIMAL(20,10) NOT NULL,
+    tenure                   SMALLINT UNSIGNED  NOT NULL,
+    beneficiary_account      JSON            NOT NULL,
+    interest_rate            DECIMAL(20,10) NOT NULL,
+    metadata                 JSON           DEFAULT (JSON_OBJECT()),
+    accessed_by              JSON           DEFAULT (JSON_OBJECT()),
+    notification_recipients  JSON           DEFAULT (JSON_OBJECT()),
+    deleted                  BOOLEAN        NOT NULL DEFAULT FALSE,
+    create_ts                TIMESTAMP(6)   DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts                TIMESTAMP(6)   DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    UNIQUE(idempotency_key, customer_profile_id),
+    INDEX end_customer_profile_id_index (end_customer_profile_id),
+    INDEX customer_profile_id_idempotency_key_index (customer_profile_id, idempotency_key)
+    );
+
+  - CREATE TABLE IF NOT EXISTS LoanAccountTransaction (
+    transaction_id           VARCHAR(256)       NOT NULL PRIMARY KEY,
+    customer_profile_id      VARCHAR(256)       NOT NULL,
+    end_customer_profile_id  VARCHAR(256)       NULL,
+    loan_account_id          VARCHAR(256)       NOT NULL,
+    amount                   DECIMAL(20, 10)    NOT NULL,
+    txn_code                 VARCHAR(256)       NOT NULL,
+    txn_type                 VARCHAR(256)       NOT NULL,
+    sub_txn_type             VARCHAR(256)       NOT NULL,
+    funding_account_id       VARCHAR(256)       NOT NULL,
+    transceiver              JSON               NOT NULL,
+    purpose                  VARCHAR(256)       NOT NULL,
+    internal_details         JSON               DEFAULT (JSON_OBJECT()),
+    currency                 VARCHAR(256)       NOT NULL,
+    txn_count                SMALLINT UNSIGNED  NOT NULL DEFAULT 0,
+    txn_status               VARCHAR(256)       NOT NULL,
+    created_by               VARCHAR(256)       NOT NULL,
+    accessed_by              JSON               DEFAULT (JSON_OBJECT()),
+    notification_recipients  JSON               DEFAULT (JSON_OBJECT()),
+    metadata                 JSON               NULL,
+    location_details         JSON               DEFAULT (JSON_OBJECT()),
+    deleted                  BOOLEAN            NOT NULL DEFAULT FALSE,
+    run_ts                   TIMESTAMP(6)       NOT NULL,
+    complete_ts              TIMESTAMP(6)       NULL,
+    booking_ts               TIMESTAMP(6)       NOT NULL,
+    value_ts                 TIMESTAMP(6)       NULL,
+    create_ts                TIMESTAMP(6)       DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts                TIMESTAMP(6)       DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    INDEX account_id_index (loan_account_id),
+    INDEX end_customer_profile_id_index (end_customer_profile_id)
+    );
+
+  - CREATE TABLE IF NOT EXISTS LoanAccountTransactionIdempotency (
+    customer_profile_id VARCHAR(256)  NOT NULL,
+    idempotency_key     VARCHAR(256)  NOT NULL,
+    request_origin      VARCHAR(100)  NOT NULL,
+    transaction_id      VARCHAR(256)  NOT NULL,
+    deleted             BOOLEAN       NOT NULL DEFAULT FALSE,
+    create_ts           TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6),
+    update_ts           TIMESTAMP(6)  DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (customer_profile_id, idempotency_key, request_origin)
+    );
